@@ -1,0 +1,94 @@
+{
+  "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+  "colName": "SaberPro - Taller 12 Hexagonal",
+  "created": "2026-11-13T23:00:00.000Z",
+  "sortNum": 10000,
+  "folders": [],
+  "settings": {
+    "envId": "",
+    "options": { "baseUrl": "http://localhost:8080" }
+  },
+  "requests": [
+    {
+      "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e02",
+      "colId": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+      "containerId": "",
+      "name": "1. Crear pregunta valida (201)",
+      "url": "{{baseUrl}}/api/preguntas",
+      "method": "POST",
+      "sortNum": 10000,
+      "created": "2026-11-13T23:00:00.000Z",
+      "modified": "2026-11-13T23:00:00.000Z",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"enunciado\": \"¿Qué patrón aísla el dominio de la infraestructura?\",\n  \"justificacion\": \"Los puertos y adaptadores aíslan el núcleo.\",\n  \"opciones\": [\n    {\"texto\": \"Hexagonal\", \"esCorrecta\": true},\n    {\"texto\": \"Singleton\", \"esCorrecta\": false},\n    {\"texto\": \"Monolito\", \"esCorrecta\": false},\n    {\"texto\": \"Capas acopladas\", \"esCorrecta\": false}\n  ]\n}",
+        "form": []
+      },
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "201" },
+        { "type": "set-env-var", "custom": "json.id", "action": "setto", "value": "{{preguntaId}}" }
+      ]
+    },
+    {
+      "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e03",
+      "colId": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+      "containerId": "",
+      "name": "2. Enviar a revision (200)",
+      "url": "{{baseUrl}}/api/preguntas/{{preguntaId}}/enviar-revision",
+      "method": "POST",
+      "sortNum": 20000,
+      "created": "2026-11-13T23:00:00.000Z",
+      "modified": "2026-11-13T23:00:00.000Z",
+      "headers": [],
+      "tests": [
+        { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+        { "type": "json-query", "custom": "json.estado", "action": "equal", "value": "PENDIENTE_REVISION" }
+      ]
+    },
+    {
+      "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e04",
+      "colId": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+      "containerId": "",
+      "name": "3. Consultar pregunta (200)",
+      "url": "{{baseUrl}}/api/preguntas/{{preguntaId}}",
+      "method": "GET",
+      "sortNum": 30000,
+      "created": "2026-11-13T23:00:00.000Z",
+      "modified": "2026-11-13T23:00:00.000Z",
+      "headers": [],
+      "tests": [{ "type": "res-code", "custom": "", "action": "equal", "value": "200" }]
+    },
+    {
+      "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e05",
+      "colId": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+      "containerId": "",
+      "name": "4. Justificacion corta (400)",
+      "url": "{{baseUrl}}/api/preguntas",
+      "method": "POST",
+      "sortNum": 40000,
+      "created": "2026-11-13T23:00:00.000Z",
+      "modified": "2026-11-13T23:00:00.000Z",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"enunciado\": \"Enunciado de prueba\",\n  \"justificacion\": \"corta\",\n  \"opciones\": []\n}",
+        "form": []
+      },
+      "tests": [{ "type": "res-code", "custom": "", "action": "equal", "value": "400" }]
+    },
+    {
+      "_id": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e06",
+      "colId": "2b8f6c1e-7a3d-4c55-9e10-0b5a1c2d3e01",
+      "containerId": "",
+      "name": "5. Pregunta inexistente (404)",
+      "url": "{{baseUrl}}/api/preguntas/9999",
+      "method": "GET",
+      "sortNum": 50000,
+      "created": "2026-11-13T23:00:00.000Z",
+      "modified": "2026-11-13T23:00:00.000Z",
+      "headers": [],
+      "tests": [{ "type": "res-code", "custom": "", "action": "equal", "value": "404" }]
+    }
+  ]
+}
