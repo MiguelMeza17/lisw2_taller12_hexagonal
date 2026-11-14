@@ -241,6 +241,18 @@ mvn test              # pruebas
 mvn spring-boot:run   # API en http://localhost:8080, consola H2 en /h2-console (jdbc:h2:mem:saberprodb, usuario sa)
 ```
 
+## Pruebas
+
+`mvn test` ejecuta pruebas JUnit 5 en tres niveles:
+
+| Nivel | Clases | Qué verifican |
+|---|---|---|
+| Dominio (Java puro, sin Spring) | `EnunciadoTest`, `JustificacionTest`, `OpcionRespuestaTest`, `PreguntaTest` | Value Objects inmutables (nulo/vacío, mínimo 15 caracteres, igualdad por valor); agregado `Pregunta` con 3 o 5 opciones, 0 o 2 claves, transición BORRADOR → PENDIENTE_REVISION y reconstitución |
+| Aplicación | `CrearPreguntaServiceTest` | `CrearPreguntaService` con el adaptador real `InMemoryQuestionAdapter` y un `NotificacionPort` falso (`NotificacionPortFalso`) |
+| Arquitectura | `DominioPuroTest` | `domain` y `application` no importan Spring, JPA ni `infrastructure` (misma regla que el workflow de CI) |
+| Adaptadores | `JpaQuestionAdapterTest`, `InMemoryQuestionAdapterTest`, `HexagonalConfigurationTest` | Cada adaptador cumple el contrato del puerto y la configuración elige el adaptador según `saberpro.persistencia` |
+| Integración (`@SpringBootTest` + MockMvc) | `PreguntaControllerTest`, `IntercambiabilidadTest` | El controlador REST con los **mismos asertos** ejecutados con el adaptador JPA y con el de memoria |
+
 ## Intercambiar el adaptador de persistencia
 
 `infrastructure/config/HexagonalConfiguration` declara con `@Bean` qué adaptador implementa
