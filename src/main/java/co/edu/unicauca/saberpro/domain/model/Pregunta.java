@@ -17,6 +17,8 @@ import java.util.List;
  *     opciones y exactamente 1 clave correcta.</li>
  *     <li>Los cambios de estado respetan las transiciones de {@link EstadoPregunta}.</li>
  * </ul>
+ * Los adaptadores rehidratan preguntas persistidas con {@link #reconstituir}, que vuelve a aplicar las
+ * invariantes en lugar de permitir fijar el estado desde fuera.
  */
 public class Pregunta {
 
@@ -45,6 +47,42 @@ public class Pregunta {
     public Pregunta(Enunciado enunciado, Justificacion justificacion) {
         this.enunciado = enunciado;
         this.justificacion = justificacion;
+    }
+
+    /**
+     * Reconstituye un agregado ya persistido. Es la única vía para que un adaptador de salida (JPA, memoria...)
+     * rehidrate una pregunta en un estado distinto de {@link EstadoPregunta#BORRADOR} sin saltarse las reglas:
+     * las opciones se agregan con {@link #agregarOpcion} (tope de {@value #NUMERO_OPCIONES}, sin repetidas) y,
+     * si el estado guardado ya superó el borrador, se vuelven a comprobar las invariantes de envío a revisión
+     * (exactamente {@value #NUMERO_OPCIONES} opciones y 1 sola clave). Un registro inconsistente no produce
+     * un agregado inválido: lanza {@link ReglaNegocioException}.
+     *
+     * @param id            identificador asignado por la persistencia (no nulo)
+     * @param enunciado     enunciado guardado
+     * @param justificacion justificación guardada
+     * @param opciones      opciones guardadas, en orden
+     * @param estado        estado guardado del ciclo de vida
+     * @return el agregado rehidratado
+     * @throws ReglaNegocioException si los datos guardados incumplen las invariantes del agregado
+     */
+    public static Pregunta reconstituir(Long id, Enunciado enunciado, Justificacion justificacion,
+                                        List<OpcionRespuesta> opciones, EstadoPregunta estado) {
+        if (id == null) {
+            throw new ReglaNegocioException("Una pregunta persistida debe tener identificador.");
+        }
+        if (estado == null) {
+            throw new ReglaNegocioException("Una pregunta persistida debe tener estado.");
+        }
+        Pregunta pregunta = new Pregunta(enunciado, justificacion);
+        pregunta.asignarId(id);
+        if (opciones != null) {
+            opciones.forEach(o -> pregunta.agregarOpcion(o.getTexto(), o.isEsCorrecta()));
+        }
+        if (estado != EstadoPregunta.BORRADOR) {
+            pregunta.validarInvariantesParaEnvio();
+        }
+        pregunta.estado = estado;
+        return pregunta;
     }
 
     /**
