@@ -36,3 +36,20 @@ co.edu.unicauca.saberpro
 mvn test              # pruebas
 mvn spring-boot:run   # API en http://localhost:8080, consola H2 en /h2-console (jdbc:h2:mem:saberprodb, usuario sa)
 ```
+
+## Intercambiar el adaptador de persistencia
+
+`infrastructure/config/HexagonalConfiguration` declara con `@Bean` qué adaptador implementa
+`PreguntaRepositoryPort`, según la propiedad `saberpro.persistencia`:
+
+| Valor | Adaptador | Almacenamiento |
+|---|---|---|
+| `jpa` (por defecto) | `JpaQuestionAdapter` | H2 en memoria vía Spring Data JPA |
+| `memoria` | `InMemoryQuestionAdapter` | `HashMap` |
+
+Se cambia en `application.properties` o al arrancar, sin tocar el paquete `domain`:
+
+```bash
+mvn spring-boot:run                                                   # JPA
+mvn spring-boot:run -Dspring-boot.run.arguments=--saberpro.persistencia=memoria   # memoria
+```
