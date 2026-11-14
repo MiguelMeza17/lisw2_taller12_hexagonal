@@ -1,0 +1,43 @@
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant Controller as PreguntaController<br/>(adaptador entrada)
+    participant UC as CrearPreguntaUseCase<br/>(puerto entrada)
+    participant Service as CrearPreguntaService<br/>(aplicación)
+    participant Pregunta as Pregunta<br/>(raíz de agregado)
+    participant RepoPort as PreguntaRepositoryPort<br/>(puerto salida)
+    participant Adapter as JpaQuestionAdapter /<br/>InMemoryQuestionAdapter
+    participant Notif as NotificacionPort<br/>(puerto salida)
+
+    Note over Cliente,Notif: Crear pregunta
+    Cliente->>Controller: POST /api/preguntas
+    Controller->>UC: crear(CrearPreguntaComando)
+    UC->>Service: crear(comando)
+    Service->>Pregunta: new Pregunta(Enunciado, Justificacion)
+    Pregunta-->>Service: valida VOs (justificación ≥ 15)
+    Service->>Pregunta: agregarOpcion(texto, esCorrecta) ×4
+    Service->>RepoPort: save(pregunta)
+    RepoPort->>Adapter: save(pregunta)
+    Adapter-->>Service: pregunta con id (BORRADOR)
+    Service-->>Controller: Pregunta
+    Controller-->>Cliente: 201 Created
+
+    Note over Cliente,Notif: Enviar a revisión
+    Cliente->>Controller: POST /api/preguntas/{id}/enviar-revision
+    Controller->>UC: enviarARevision(id)
+    UC->>Service: enviarARevision(id)
+    Service->>RepoPort: findById(id)
+    RepoPort->>Adapter: findById(id)
+    Adapter-->>Service: Optional con la pregunta
+    Service->>Pregunta: enviarARevision()
+    alt 4 opciones y 1 sola clave
+        Pregunta-->>Service: estado = PENDIENTE_REVISION
+        Service->>RepoPort: save(pregunta)
+        Service->>Notif: notificarEnvioARevision(pregunta)
+        Service-->>Controller: Pregunta
+        Controller-->>Cliente: 200 OK
+    else invariante incumplida
+        Pregunta-->>Service: ReglaNegocioException
+        Service-->>Controller: ReglaNegocioException
+        Controller-->>Cliente: 400 / 422
+    end
