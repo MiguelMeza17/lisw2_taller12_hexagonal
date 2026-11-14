@@ -234,6 +234,12 @@ classDiagram
     CrearPreguntaService ..> Pregunta
 ```
 
+## Informe técnico y evidencias
+
+- Informe en la plantilla oficial: [`docs/lisw2_taller12_g1.docx`](docs/lisw2_taller12_g1.docx) (modelo hexagonal, modelo DDD, diagramas, evidencias de intercambiabilidad y resultado de las pruebas).
+- Diagramas en PNG: [`docs/diagramas/`](docs/diagramas/) (generados desde los `.mmd`).
+- Evidencias del experimento de intercambiabilidad: [`docs/evidencias/intercambiabilidad.md`](docs/evidencias/intercambiabilidad.md).
+
 ## Ejecutar
 
 ```bash
