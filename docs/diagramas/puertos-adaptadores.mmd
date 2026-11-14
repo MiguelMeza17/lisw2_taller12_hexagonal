@@ -1,0 +1,54 @@
+graph TD
+    Cliente(["Cliente HTTP<br/>(Thunder Client / Postman)"])
+
+    subgraph DrivingAdapters["Adaptadores de entrada (driving)"]
+        Controller["PreguntaController<br/>(infrastructure/adapter/in/web)"]
+    end
+
+    subgraph Hexagono["Núcleo del hexágono"]
+        subgraph PortsIn["Puertos de entrada (domain.ports.inbound)"]
+            CrearUC["CrearPreguntaUseCase"]
+            ConsultarUC["ConsultarPreguntaUseCase"]
+        end
+        subgraph App["Capa de aplicación"]
+            Service["CrearPreguntaService<br/>(application/service)"]
+        end
+        subgraph Dominio["Dominio puro (domain.model)"]
+            Pregunta["Pregunta<br/>(raíz de agregado)"]
+            VOs["Enunciado · Justificacion · OpcionRespuesta<br/>(objetos de valor)"]
+            Estado["EstadoPregunta"]
+        end
+        subgraph PortsOut["Puertos de salida (domain.ports.outbound)"]
+            RepoPort["PreguntaRepositoryPort<br/>save · findById"]
+            NotifPort["NotificacionPort"]
+        end
+    end
+
+    subgraph DrivenAdapters["Adaptadores de salida (driven)"]
+        JpaAdapter["JpaQuestionAdapter<br/>(persistence/jpa)"]
+        MemAdapter["InMemoryQuestionAdapter<br/>(persistence/memory)"]
+        LogAdapter["Adaptador de notificaciones<br/>(log)"]
+        SpringData["SpringDataPreguntaRepository"]
+        Mapa[("HashMap")]
+        H2[("H2<br/>jdbc:h2:mem:saberprodb")]
+    end
+
+    Config{{"HexagonalConfiguration<br/>saberpro.persistencia = jpa | memoria"}}
+
+    Cliente -->|"HTTP"| Controller
+    Controller -->|"usa"| CrearUC
+    Controller -->|"usa"| ConsultarUC
+    Service -.->|"implementa"| CrearUC
+    Service -.->|"implementa"| ConsultarUC
+    Service -->|"opera sobre"| Pregunta
+    Pregunta --> VOs
+    Pregunta --> Estado
+    Service -->|"guarda / carga"| RepoPort
+    Service -->|"notifica"| NotifPort
+    JpaAdapter -.->|"implementa"| RepoPort
+    MemAdapter -.->|"implementa"| RepoPort
+    LogAdapter -.->|"implementa"| NotifPort
+    JpaAdapter --> SpringData --> H2
+    MemAdapter --> Mapa
+    Config -.->|"elige con @Bean"| JpaAdapter
+    Config -.->|"elige con @Bean"| MemAdapter

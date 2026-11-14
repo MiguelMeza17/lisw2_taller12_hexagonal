@@ -30,6 +30,210 @@ co.edu.unicauca.saberpro
     └── config/                       conexión de adaptadores con puertos
 ```
 
+## Diagramas
+
+Fuentes en `docs/diagramas/*.mmd` (Mermaid; GitHub los dibuja directamente).
+
+### Puertos y adaptadores
+
+```mermaid
+graph TD
+    Cliente(["Cliente HTTP<br/>(Thunder Client / Postman)"])
+
+    subgraph DrivingAdapters["Adaptadores de entrada (driving)"]
+        Controller["PreguntaController<br/>(infrastructure/adapter/in/web)"]
+    end
+
+    subgraph Hexagono["Núcleo del hexágono"]
+        subgraph PortsIn["Puertos de entrada (domain.ports.inbound)"]
+            CrearUC["CrearPreguntaUseCase"]
+            ConsultarUC["ConsultarPreguntaUseCase"]
+        end
+        subgraph App["Capa de aplicación"]
+            Service["CrearPreguntaService<br/>(application/service)"]
+        end
+        subgraph Dominio["Dominio puro (domain.model)"]
+            Pregunta["Pregunta<br/>(raíz de agregado)"]
+            VOs["Enunciado · Justificacion · OpcionRespuesta<br/>(objetos de valor)"]
+            Estado["EstadoPregunta"]
+        end
+        subgraph PortsOut["Puertos de salida (domain.ports.outbound)"]
+            RepoPort["PreguntaRepositoryPort<br/>save · findById"]
+            NotifPort["NotificacionPort"]
+        end
+    end
+
+    subgraph DrivenAdapters["Adaptadores de salida (driven)"]
+        JpaAdapter["JpaQuestionAdapter<br/>(persistence/jpa)"]
+        MemAdapter["InMemoryQuestionAdapter<br/>(persistence/memory)"]
+        LogAdapter["Adaptador de notificaciones<br/>(log)"]
+        SpringData["SpringDataPreguntaRepository"]
+        Mapa[("HashMap")]
+        H2[("H2<br/>jdbc:h2:mem:saberprodb")]
+    end
+
+    Config{{"HexagonalConfiguration<br/>saberpro.persistencia = jpa | memoria"}}
+
+    Cliente -->|"HTTP"| Controller
+    Controller -->|"usa"| CrearUC
+    Controller -->|"usa"| ConsultarUC
+    Service -.->|"implementa"| CrearUC
+    Service -.->|"implementa"| ConsultarUC
+    Service -->|"opera sobre"| Pregunta
+    Pregunta --> VOs
+    Pregunta --> Estado
+    Service -->|"guarda / carga"| RepoPort
+    Service -->|"notifica"| NotifPort
+    JpaAdapter -.->|"implementa"| RepoPort
+    MemAdapter -.->|"implementa"| RepoPort
+    LogAdapter -.->|"implementa"| NotifPort
+    JpaAdapter --> SpringData --> H2
+    MemAdapter --> Mapa
+    Config -.->|"elige con @Bean"| JpaAdapter
+    Config -.->|"elige con @Bean"| MemAdapter
+```
+
+### Secuencia: crear pregunta y enviarla a revisión
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant Controller as PreguntaController<br/>(adaptador entrada)
+    participant UC as CrearPreguntaUseCase<br/>(puerto entrada)
+    participant Service as CrearPreguntaService<br/>(aplicación)
+    participant Pregunta as Pregunta<br/>(raíz de agregado)
+    participant RepoPort as PreguntaRepositoryPort<br/>(puerto salida)
+    participant Adapter as JpaQuestionAdapter /<br/>InMemoryQuestionAdapter
+    participant Notif as NotificacionPort<br/>(puerto salida)
+
+    Note over Cliente,Notif: Crear pregunta
+    Cliente->>Controller: POST /api/preguntas
+    Controller->>UC: crear(CrearPreguntaComando)
+    UC->>Service: crear(comando)
+    Service->>Pregunta: new Pregunta(Enunciado, Justificacion)
+    Pregunta-->>Service: valida VOs (justificación ≥ 15)
+    Service->>Pregunta: agregarOpcion(texto, esCorrecta) ×4
+    Service->>RepoPort: save(pregunta)
+    RepoPort->>Adapter: save(pregunta)
+    Adapter-->>Service: pregunta con id (BORRADOR)
+    Service-->>Controller: Pregunta
+    Controller-->>Cliente: 201 Created
+
+    Note over Cliente,Notif: Enviar a revisión
+    Cliente->>Controller: POST /api/preguntas/{id}/enviar-revision
+    Controller->>UC: enviarARevision(id)
+    UC->>Service: enviarARevision(id)
+    Service->>RepoPort: findById(id)
+    RepoPort->>Adapter: findById(id)
+    Adapter-->>Service: Optional con la pregunta
+    Service->>Pregunta: enviarARevision()
+    alt 4 opciones y 1 sola clave
+        Pregunta-->>Service: estado = PENDIENTE_REVISION
+        Service->>RepoPort: save(pregunta)
+        Service->>Notif: notificarEnvioARevision(pregunta)
+        Service-->>Controller: Pregunta
+        Controller-->>Cliente: 200 OK
+    else invariante incumplida
+        Pregunta-->>Service: ReglaNegocioException
+        Service-->>Controller: ReglaNegocioException
+        Controller-->>Cliente: 400 / 422
+    end
+```
+
+### Clases del dominio y puertos
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Pregunta {
+        <<AggregateRoot>>
+        -Long id
+        -EstadoPregunta estado
+        +NUMERO_OPCIONES = 4
+        +agregarOpcion(String, boolean)
+        +enviarARevision()
+        +iniciarRevision()
+        +aprobar()
+        +rechazar()
+        +publicar()
+        +archivar()
+        +getOpciones() List~OpcionRespuesta~
+        -validarInvariantesParaEnvio()
+    }
+    class Enunciado {
+        <<ValueObject>>
+        -String texto
+    }
+    class Justificacion {
+        <<ValueObject>>
+        -String texto
+        +LONGITUD_MINIMA = 15
+    }
+    class OpcionRespuesta {
+        <<ValueObject>>
+        -String texto
+        -boolean esCorrecta
+    }
+    class EstadoPregunta {
+        <<enumeration>>
+        BORRADOR
+        PENDIENTE_REVISION
+        EN_REVISION
+        APROBADA
+        PUBLICADA
+        ARCHIVADA
+        +puedeTransitarA(EstadoPregunta) boolean
+    }
+    class DomainException
+    class ReglaNegocioException
+    class PreguntaNoEncontradaException
+
+    class CrearPreguntaUseCase {
+        <<interface>>
+        +crear(CrearPreguntaComando) Pregunta
+        +enviarARevision(Long) Pregunta
+    }
+    class ConsultarPreguntaUseCase {
+        <<interface>>
+        +obtener(Long) Pregunta
+    }
+    class CrearPreguntaComando {
+        <<record>>
+        +String enunciado
+        +String justificacion
+        +List~Opcion~ opciones
+    }
+    class PreguntaRepositoryPort {
+        <<interface>>
+        +save(Pregunta) Pregunta
+        +findById(Long) Optional~Pregunta~
+    }
+    class NotificacionPort {
+        <<interface>>
+        +notificarEnvioARevision(Pregunta)
+    }
+    class CrearPreguntaService {
+        -PreguntaRepositoryPort repositorio
+        -NotificacionPort notificaciones
+    }
+
+    Pregunta *-- "1" Enunciado
+    Pregunta *-- "1" Justificacion
+    Pregunta *-- "0..4" OpcionRespuesta
+    Pregunta --> EstadoPregunta
+    DomainException <|-- ReglaNegocioException
+    DomainException <|-- PreguntaNoEncontradaException
+    Pregunta ..> ReglaNegocioException : lanza
+    CrearPreguntaUseCase ..> CrearPreguntaComando
+    CrearPreguntaUseCase <|.. CrearPreguntaService
+    ConsultarPreguntaUseCase <|.. CrearPreguntaService
+    CrearPreguntaService --> PreguntaRepositoryPort
+    CrearPreguntaService --> NotificacionPort
+    CrearPreguntaService ..> Pregunta
+```
+
 ## Ejecutar
 
 ```bash

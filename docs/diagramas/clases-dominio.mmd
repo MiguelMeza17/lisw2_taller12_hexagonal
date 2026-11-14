@@ -1,0 +1,88 @@
+classDiagram
+    direction LR
+
+    class Pregunta {
+        <<AggregateRoot>>
+        -Long id
+        -EstadoPregunta estado
+        +NUMERO_OPCIONES = 4
+        +agregarOpcion(String, boolean)
+        +enviarARevision()
+        +iniciarRevision()
+        +aprobar()
+        +rechazar()
+        +publicar()
+        +archivar()
+        +getOpciones() List~OpcionRespuesta~
+        -validarInvariantesParaEnvio()
+    }
+    class Enunciado {
+        <<ValueObject>>
+        -String texto
+    }
+    class Justificacion {
+        <<ValueObject>>
+        -String texto
+        +LONGITUD_MINIMA = 15
+    }
+    class OpcionRespuesta {
+        <<ValueObject>>
+        -String texto
+        -boolean esCorrecta
+    }
+    class EstadoPregunta {
+        <<enumeration>>
+        BORRADOR
+        PENDIENTE_REVISION
+        EN_REVISION
+        APROBADA
+        PUBLICADA
+        ARCHIVADA
+        +puedeTransitarA(EstadoPregunta) boolean
+    }
+    class DomainException
+    class ReglaNegocioException
+    class PreguntaNoEncontradaException
+
+    class CrearPreguntaUseCase {
+        <<interface>>
+        +crear(CrearPreguntaComando) Pregunta
+        +enviarARevision(Long) Pregunta
+    }
+    class ConsultarPreguntaUseCase {
+        <<interface>>
+        +obtener(Long) Pregunta
+    }
+    class CrearPreguntaComando {
+        <<record>>
+        +String enunciado
+        +String justificacion
+        +List~Opcion~ opciones
+    }
+    class PreguntaRepositoryPort {
+        <<interface>>
+        +save(Pregunta) Pregunta
+        +findById(Long) Optional~Pregunta~
+    }
+    class NotificacionPort {
+        <<interface>>
+        +notificarEnvioARevision(Pregunta)
+    }
+    class CrearPreguntaService {
+        -PreguntaRepositoryPort repositorio
+        -NotificacionPort notificaciones
+    }
+
+    Pregunta *-- "1" Enunciado
+    Pregunta *-- "1" Justificacion
+    Pregunta *-- "0..4" OpcionRespuesta
+    Pregunta --> EstadoPregunta
+    DomainException <|-- ReglaNegocioException
+    DomainException <|-- PreguntaNoEncontradaException
+    Pregunta ..> ReglaNegocioException : lanza
+    CrearPreguntaUseCase ..> CrearPreguntaComando
+    CrearPreguntaUseCase <|.. CrearPreguntaService
+    ConsultarPreguntaUseCase <|.. CrearPreguntaService
+    CrearPreguntaService --> PreguntaRepositoryPort
+    CrearPreguntaService --> NotificacionPort
+    CrearPreguntaService ..> Pregunta
